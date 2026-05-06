@@ -1,0 +1,6 @@
+flask
+flask-cors
+flask-restful
+mysql-connector-python
+pytest
+requests

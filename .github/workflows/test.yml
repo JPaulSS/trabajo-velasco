@@ -1,0 +1,72 @@
+name: Pruebas_Biblioteca
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: biblioteca
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout_code
+        uses: actions/checkout@v4
+
+      - name: Instalar cliente MySQL
+        run: sudo apt-get update && sudo apt-get install -y mysql-client
+
+      - name: Cargar Base de Datos
+        run: |
+          # Esperar a que el motor de BD esté listo
+          until mysqladmin ping -h 127.0.0.1 -u root -proot --silent; do
+            echo "Esperando a MySQL..."
+            sleep 2
+          done
+          # Importar el archivo SQL que está en la raíz según tu captura
+          mysql -h 127.0.0.1 -u root -proot biblioteca < biblioteca_completa.sql
+
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Ejecutar Pruebas por Microservicio
+        run: |
+          # Probando Países (Puerto 5082)
+          python services/paises/app.py &
+          sleep 5
+          pytest services/paises/test_paises.py
+
+          # Probando Autores (Puerto 5081)
+          python services/autores/app.py &
+          sleep 5
+          pytest services/autores/test_autores.py
+
+          # Probando Editoriales (Puerto 5083)
+          python services/editoriales/app.py &
+          sleep 5
+          pytest services/editoriales/test_editoriales.py
+
+          # Probando Usuarios (Puerto 5080)
+          python services/usuarios/app.py &
+          sleep 5
+          pytest services/usuarios/test_usuarios.py
